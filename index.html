@@ -7,20 +7,25 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Background Music - Completely Hidden -->
-    <iframe 
-        id="backgroundMusic" 
-        src="https://www.youtube.com/embed/tJbDzPo9wWE?autoplay=1&loop=1&playlist=tJbDzPo9wWE&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&fs=0&mute=0&enablejsapi=1"
-        style="position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: none;"
-        allow="autoplay; encrypted-media"
-        allowfullscreen>
-    </iframe>
+    <!-- Background Music with Volume Control -->
+    <audio id="backgroundMusic" loop style="display: none;" volume="0.05">
+        <source src="background-music.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- Background Music Volume Control -->
+    <div class="background-music-controls" style="position: fixed; top: 20px; left: 20px; z-index: 1000; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 14px; color: #333;">🎵 Background:</span>
+            <input type="range" id="backgroundVolumeSlider" min="0" max="100" value="5" style="width: 100px;">
+            <span id="backgroundVolumeValue" style="font-size: 12px; color: #666;">5%</span>
+        </div>
+    </div>
     
     <script>
         // Simple password protection
         function checkPassword() {
             var password = document.getElementById('passwordInput').value;
-            if (password === 'haz-voucher') {
+            if (password === 'haz') {
                 document.getElementById('passwordModal').style.display = 'none';
                 // Remove blur from background pages
                 var pages = document.querySelectorAll('.page');
@@ -28,9 +33,49 @@
                     pages[i].style.filter = 'none';
                 }
                 document.body.style.overflow = 'auto';
+                // Show Chatbase chatbot after password is correct
+                showChatbaseWidget();
+                // Initialize mobile audio after user interaction
+                setTimeout(initMobileAudio, 500);
+                // Initialize background music control
+                setTimeout(setupBackgroundMusicControl, 1000);
             } else {
                 alert('Password anda salah!');
                 document.getElementById('passwordInput').value = '';
+            }
+        }
+        
+        function showChatbaseWidget() {
+            // Load Chatbase widget only after password is correct
+            if (!window.chatbase || window.chatbase("getState") !== "initialized") {
+                window.chatbase = (...arguments) => {
+                    if (!window.chatbase.q) {
+                        window.chatbase.q = [];
+                    }
+                    window.chatbase.q.push(arguments);
+                };
+                window.chatbase = new Proxy(window.chatbase, {
+                    get(target, prop) {
+                        if (prop === "q") {
+                            return target.q;
+                        }
+                        return (...args) => target(prop, ...args);
+                    }
+                });
+            }
+            
+            const onLoad = function() {
+                const script = document.createElement("script");
+                script.src = "https://www.chatbase.co/embed.min.js";
+                script.id = "0VLDRulTvgGgr-pezX_Ve";
+                script.domain = "www.chatbase.co";
+                document.body.appendChild(script);
+            };
+            
+            if (document.readyState === "complete") {
+                onLoad();
+            } else {
+                window.addEventListener("load", onLoad);
             }
         }
         
@@ -40,17 +85,14 @@
             }
         }
         
-        // Force play on any user interaction to bypass autoplay restrictions
+        // Background music control
         function startMusic() {
-            const iframe = document.getElementById('backgroundMusic');
-            if (iframe && iframe.contentWindow) {
-                try {
-                    // Try to unmute and play
-                    iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
-                    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                } catch(e) {
-                    console.log('Music started');
-                }
+            const audio = document.getElementById('backgroundMusic');
+            if (audio) {
+                audio.volume = 0.05; // Set default volume to 5%
+                audio.play().catch(e => {
+                    console.log('Background music autoplay blocked, will start on user interaction');
+                });
             }
         }
         
@@ -65,6 +107,225 @@
         window.addEventListener('load', function() {
             setTimeout(startMusic, 1000);
         });
+        
+        // Background music control
+        function startMusic() {
+            const audio = document.getElementById('backgroundMusic');
+            if (audio) {
+                audio.volume = 0.05; // Set default volume to 5%
+                audio.play().catch(e => {
+                    console.log('Background music autoplay blocked, will start on user interaction');
+                });
+            }
+        }
+        
+        // Enhanced mobile audio support
+        function setupMobileAudio() {
+            const audioElements = document.querySelectorAll('.chapter-audio');
+            
+            audioElements.forEach(audio => {
+                // Add mobile-specific attributes
+                audio.setAttribute('playsinline', '');
+                audio.setAttribute('webkit-playsinline', '');
+                audio.setAttribute('preload', 'metadata');
+                audio.setAttribute('controlsList', 'nodownload');
+                
+                // Force mobile audio to be ready
+                audio.load();
+                
+                // Handle mobile audio playback
+                audio.addEventListener('play', function() {
+                    console.log('Audio playing - pausing others');
+                    // Pause other audio elements when one starts playing
+                    audioElements.forEach(otherAudio => {
+                        if (otherAudio !== audio && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
+                    // Lower background music volume when audio plays
+                    lowerBackgroundMusicVolume();
+                });
+                
+                // Handle mobile audio pause
+                audio.addEventListener('pause', function() {
+                    console.log('Audio paused');
+                    // Check if any other audio is playing
+                    const anyAudioPlaying = Array.from(audioElements).some(a => !a.paused);
+                    if (!anyAudioPlaying) {
+                        restoreBackgroundMusicVolume();
+                    }
+                });
+                
+                // Handle audio ended
+                audio.addEventListener('ended', function() {
+                    console.log('Audio ended');
+                    // Check if any other audio is playing
+                    const anyAudioPlaying = Array.from(audioElements).some(a => !a.paused);
+                    if (!anyAudioPlaying) {
+                        restoreBackgroundMusicVolume();
+                    }
+                });
+                
+                // Handle mobile touch events - CRITICAL for mobile
+                audio.addEventListener('touchstart', function(e) {
+                    // Don't prevent default to allow native controls to work
+                    audio.load();
+                });
+                
+                // Handle mobile click events
+                audio.addEventListener('click', function(e) {
+                    // Don't prevent default to allow native controls to work
+                    audio.load();
+                });
+                
+                // Handle play button clicks specifically
+                audio.addEventListener('play', function() {
+                    console.log('Audio started playing');
+                });
+                
+                // Handle pause button clicks specifically
+                audio.addEventListener('pause', function() {
+                    console.log('Audio paused');
+                });
+                
+                // Handle audio ended
+                audio.addEventListener('ended', function() {
+                    console.log('Audio ended');
+                });
+                
+                // Handle mobile user interaction requirement
+                audio.addEventListener('canplay', function() {
+                    console.log('Audio ready for mobile playback');
+                });
+                
+                // Handle mobile audio errors
+                audio.addEventListener('error', function(e) {
+                    console.log('Audio error:', e);
+                    // Try to reload the audio
+                    setTimeout(() => {
+                        audio.load();
+                    }, 1000);
+                });
+                
+                // Handle mobile audio loading
+                audio.addEventListener('loadstart', function() {
+                    console.log('Audio loading started');
+                });
+                
+                // Handle mobile audio loaded
+                audio.addEventListener('loadedmetadata', function() {
+                    console.log('Audio metadata loaded');
+                });
+                
+                // Add user interaction handler for mobile
+                audio.addEventListener('canplaythrough', function() {
+                    console.log('Audio fully loaded and ready');
+                });
+            });
+        }
+        
+        // Additional mobile audio initialization
+        function initMobileAudio() {
+            // Wait for page to be fully loaded
+            if (document.readyState === 'complete') {
+                setupMobileAudio();
+            } else {
+                window.addEventListener('load', setupMobileAudio);
+            }
+        }
+        
+        // Initialize mobile audio support
+        document.addEventListener('DOMContentLoaded', setupMobileAudio);
+        
+        // Mobile audio test function
+        function testMobileAudio() {
+            const audioElements = document.querySelectorAll('.chapter-audio');
+            console.log('Found audio elements:', audioElements.length);
+            
+            audioElements.forEach((audio, index) => {
+                console.log(`Audio ${index + 1}:`, {
+                    src: audio.src,
+                    readyState: audio.readyState,
+                    networkState: audio.networkState,
+                    paused: audio.paused,
+                    duration: audio.duration
+                });
+            });
+        }
+        
+        // Test audio on page load
+        window.addEventListener('load', testMobileAudio);
+        
+        // Mobile audio control function
+        function handleMobileAudioControl(audio) {
+            if (audio.paused) {
+                // Pause all other audios first
+                const allAudios = document.querySelectorAll('.chapter-audio');
+                allAudios.forEach(otherAudio => {
+                    if (otherAudio !== audio && !otherAudio.paused) {
+                        otherAudio.pause();
+                    }
+                });
+                // Then play this audio
+                audio.play().catch(e => {
+                    console.log('Play failed:', e);
+                });
+            } else {
+                // Pause this audio
+                audio.pause();
+            }
+        }
+        
+        // Background music volume control
+        function lowerBackgroundMusicVolume() {
+            const audio = document.getElementById('backgroundMusic');
+            if (audio) {
+                // Lower background music volume when audio plays
+                audio.volume = 0.02; // Very quiet
+                console.log('Background music volume lowered');
+            }
+        }
+        
+        function restoreBackgroundMusicVolume() {
+            const audio = document.getElementById('backgroundMusic');
+            const slider = document.getElementById('backgroundVolumeSlider');
+            if (audio && slider) {
+                // Restore background music volume based on slider
+                const volume = slider.value / 100;
+                audio.volume = volume;
+                console.log('Background music volume restored to', volume);
+            }
+        }
+        
+        // Setup background music volume control
+        function setupBackgroundMusicControl() {
+            const slider = document.getElementById('backgroundVolumeSlider');
+            const value = document.getElementById('backgroundVolumeValue');
+            const audio = document.getElementById('backgroundMusic');
+            
+            if (slider && value && audio) {
+                slider.addEventListener('input', function() {
+                    const volume = this.value / 100;
+                    audio.volume = volume;
+                    value.textContent = this.value + '%';
+                    
+                    // Store volume preference
+                    localStorage.setItem('backgroundMusicVolume', this.value);
+                });
+                
+                // Load saved volume preference
+                const savedVolume = localStorage.getItem('backgroundMusicVolume');
+                if (savedVolume) {
+                    slider.value = savedVolume;
+                    value.textContent = savedVolume + '%';
+                    audio.volume = savedVolume / 100;
+                } else {
+                    // Set default volume
+                    audio.volume = 0.05;
+                }
+            }
+        }
+        
     </script>
 </head>
 <body>
@@ -114,6 +375,16 @@
             <h1 class="chapter-title">Kenapa Belajar Itu Ibadah?</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 1 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 1</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab1.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Sering benar kita dengar soalan yang berbunyi begini: "Belajar itu perlu sangatkah? Bukankah yang lebih utama mencari rezeki, mengisi perut, menyusun kehidupan agar senang?" Soalan itu nampak mudah, namun jawapannya jauh lebih dalam daripada sekadar "ya" atau "tidak."</p>
             
             <p>Jika belajar hanya dipandang sebagai jalan mendapatkan gaji besar, pangkat tinggi, atau status di mata manusia,benarlah ia akan kelihatan hambar, membosankan, bahkan kadang menyesakkan. Tetapi Islam mengajar kita satu hakikat yang lebih mulia: belajar itu sendiri adalah ibadah. Ya, ibadah,setara dengan solat, puasa, zakat, bahkan haji. Bezanya, medan ibadah belajar ini amat luas, bergantung pada niat yang menyalakan di hati.</p>
@@ -167,6 +438,16 @@
             <h1 class="chapter-title">Persiapan Sebelum Buka Buku</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 2 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 2</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab2.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Bayangkan seseorang mahu melangkah masuk ke rumah Allah, masjid yang suci. Tentu dia tidak main redah sahaja. Ada persiapan yang mesti dibuat: mengambil wuduk, mengenakan pakaian bersih, menyapu sedikit wangian. Semua itu tanda dia hadir dengan adab, kerana yang bakal ditemuinya ialah Allah.</p>
             
             <p>Begitu juga dengan belajar. Kita bukan sekadar berjumpa buku, bukan hanya menatap kertas dan dakwat. Kita sebenarnya sedang berjumpa dengan ilmu. Dan ilmu itu, hakikatnya milik Allah. Maka, wajarlah ada adab, ada persiapan hati dan jasad sebelum kita membuka halaman pertama.</p>
@@ -257,6 +538,16 @@
             <h1 class="chapter-title">Semasa Sedang Belajar</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 3 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 3</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab3.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Sekarang kita sudah bersedia. Niat sudah diperbetulkan, wuduk sudah diambil, doa sudah dibaca. Meja pun sudah tersusun, telefon diletakkan jauh, hati terasa lapang. Maka tinggallah satu perkara sahaja: kita benar-benar terjun ke dalam lautan ilmu.</p>
             
             <p>Ramai pelajar gagal di titik inilah. Mereka duduk di hadapan buku selama dua jam, tetapi yang masuk ke dalam kepala cuma dua peratus. Kenapa jadi begitu? Sebab mereka belajar tanpa panduan, tanpa adab, dan tanpa roh. Islam, agama kita yang sempurna, bukan sahaja mengajar cara beribadah, malah juga mengajar cara menuntut ilmu dengan penuh adab, penuh keberkatan, dan penuh hikmah.</p>
@@ -272,7 +563,7 @@
             <p>Kalau membaca Sains, kaitkan dengan kebesaran Allah. Kalau membaca Matematik, renungi sistem dan keadilan Allah. Kalau membaca Sejarah, ambil iktibar bagaimana umat Islam bangun dan jatuh. Belajar bukan untuk menimbun hafalan semata-mata, tetapi untuk memahami, menghayati, dan mengambil hikmah.</p>
             
             <h2>3. Tangan Bergerak, Otak Ingat</h2>
-            <p>Mata sahaja yang bergerak membaca akan cepat bosan. Tetapi bila tangan turut menulis atau menaip otak jadi aktif. Ulama dahulu, setiap kali guru mereka bercakap, mereka akan mencatat. Begitu juga kita hari ini:</p>
+            <p>Mata sahaja yang bergerak membaca akan cepat bosan. Tetapi bila tangan turut menulis, otak jadi aktif. Ulama dahulu, setiap kali guru mereka bercakap, mereka akan mencatat. Begitu juga kita hari ini:</p>
             
             <ul>
                 <li>Buat nota ringkas,</li>
@@ -320,6 +611,16 @@
             <h1 class="chapter-title">Selepas Belajar</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 4 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 4</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab4.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Ramai pelajar menyangka, selesai sudah belajar apabila buku ditutup dan pen diletakkan. Tetapi hakikatnya, perjalanan ilmu baru sahaja bermula selepas kita berhenti membaca. Jika kita tidak menjaga ilmu selepas belajar, banyak perkara akan hilang begitu sahaja, seperti pasir halus yang mengalir keluar di celah jari. Islam mengajar kita supaya mengikat ilmu dengan amalan, syukur, dan adab.</p>
             
             <h2>1. Ucap Alhamdulillah</h2>
@@ -385,6 +686,16 @@
             <h1 class="chapter-title">Amalan Tambahan untuk Kuat Ingatan</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 5 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 5</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab5.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Kalau kita tanya pelajar, masalah paling besar dalam belajar bukanlah malas semata-mata, tetapi lupa. Baru semalam tekun membaca, esoknya sudah kabur. Sudah bersusah-payah menghafal panjang-panjang, masuk dewan peperiksaan tiba-tiba semuanya hilang dari ingatan.</p>
             
             <p>Namun, ulama silam telah meninggalkan kita jejak amalan. Mereka bukan sahaja belajar dengan tekun, bahkan mereka menjaga hati, lidah, dan gaya hidup agar akal sentiasa tajam. Rahsia mereka bukan sihir, bukan magik, tetapi gabungan doa, adab, dan disiplin hidup yang sihat serta penuh berkat.</p>
@@ -447,6 +758,16 @@
             <h1 class="chapter-title">Belajar Gaya Islam dalam Zaman Moden</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 6 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 6</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab6.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Zaman dahulu, para ulama menuntut ilmu dengan penuh kesusahan dan ketekunan. Ada yang belajar bertemankan cahaya lilin yang redup, ada yang berjalan kaki beratus bahkan beribu kilometer hanya untuk bertemu seorang guru, ada yang menulis nota dengan bulu ayam di atas kulit atau pelepah tamar.</p>
             
             <p>Kita hari ini lain sekali keadaannya. iPad, YouTube, Google, bahkan kecerdasan buatan (AI) semuanya terbentang di hujung jari. Ilmu seakan mudah, seakan deras mengalir. Namun, jangan tertipu. Cabarannya bukan lagi pada kesukaran mencari ilmu, tetapi pada terlalu banyaknya gangguan yang melalaikan.</p>
@@ -541,6 +862,16 @@
             <h1 class="chapter-title">Kisah Inspirasi: Dari Ulama ke Pelajar Zaman Kini</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 7 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 7</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab7.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Kadang-kadang kita merasa belajar ini sungguh berat. Buku tebal, tugasan menimbun, peperiksaan pula semakin hampir. Hati gelisah, akal penat, semangat pun menurun. Tetapi, bila kita singkap kembali lembaran kisah orang terdahulu – para ulama, cendekiawan, dan juga pelajar zaman moden – kita akan sedar sesuatu: kalau mereka mampu menanggung beban dan berjaya, maka kita juga mampu. Bezanya cuma pada kemahuan, kesungguhan, dan sandaran kita kepada Allah.</p>
             
             <h2>1. Imam Syafie: Ingatan Luar Biasa</h2>
@@ -609,6 +940,16 @@
             <h1 class="chapter-title">Strategi Praktikal Belajar Gaya Islam</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 8 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 8</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab8.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Ilmu tanpa amal ibarat pohon yang tidak berbuah. Cantik daunnya, tetapi tiada hasil yang boleh dinikmati. Begitulah juga belajar: kalau hanya membaca dan mendengar tanpa ada amalan, ilmu itu akan kering di kertas, tidak hidup dalam jiwa. Sebab itu, selepas kita memahami konsep, doa, dan mengambil inspirasi daripada kisah-kisah ulama serta pelajar terdahulu, tibalah masanya kita masuk kepada perkara paling penting: strategi praktikal. Langkah demi langkah, yang boleh terus dipraktikkan oleh seorang pelajar Muslim, agar belajarnya bukan sekadar akademik, tetapi ibadah.</p>
             
             <h2>1. Sebelum Belajar</h2>
@@ -712,6 +1053,16 @@
             <h1 class="chapter-title">Penutup & Wasiat Ilmu</h1>
         </div>
         <div class="chapter-content">
+            <!-- Audio Player for Bab 9 -->
+            <div class="audio-player">
+                <h3>🎧 Dengarkan Audio Bab 9</h3>
+                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                    <source src="Bab9.mp3" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+                <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
+            </div>
+            
             <p class="drop-cap">Alhamdulillāh, setinggi-tinggi kesyukuran kita panjatkan ke hadrat Allah SWT kerana dengan limpah rahmat-Nya kita dapat menamatkan perjalanan buku ini. Dari helaian pertama hingga ke helaian terakhir, kita telah bersama-sama menghayati suatu kembara ilmu yang bukan sahaja berbicara tentang cara belajar, tetapi juga cara hidup sebagai seorang Muslim yang menuntut ilmu.</p>
             
             <p>Kita sudah menyingkap tentang niat yang tulus sebelum belajar, amalan yang mengiringi ketika belajar, doa dan zikir yang membajai jiwa, disiplin yang menguatkan langkah, cabaran zaman moden yang menguji keteguhan, kisah ulama dan pelajar yang menjadi teladan, hingga kepada strategi praktikal yang boleh dipraktikkan dalam kehidupan seharian. Semua itu bukan sekadar catatan teori di atas kertas, tetapi ia adalah panduan hidup – jalan seorang penuntut ilmu yang ingin mengikat dunia dan akhirat dalam satu ikatan keberkatan.</p>
@@ -760,11 +1111,12 @@
         </div>
     </div>
 
+
+
     <!-- Print Controls (hidden by default) -->
     <div class="print-controls">
         <button onclick="window.print()" class="print-btn">Print / Export PDF</button>
     </div>
+
 </body>
 </html>
-
-
