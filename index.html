@@ -170,12 +170,33 @@
                 audio.addEventListener('touchstart', function(e) {
                     // Don't prevent default to allow native controls to work
                     audio.load();
+                    // Force play on mobile touch
+                    setTimeout(() => {
+                        if (audio.paused) {
+                            audio.play().catch(e => {
+                                console.log('Touch play failed, user interaction required');
+                            });
+                        }
+                    }, 100);
                 });
                 
                 // Handle mobile click events
                 audio.addEventListener('click', function(e) {
                     // Don't prevent default to allow native controls to work
                     audio.load();
+                    // Force play on mobile click
+                    setTimeout(() => {
+                        if (audio.paused) {
+                            audio.play().catch(e => {
+                                console.log('Click play failed, user interaction required');
+                            });
+                        }
+                    }, 100);
+                });
+                
+                // Additional mobile play button handling
+                audio.addEventListener('play', function() {
+                    console.log('Audio started playing on mobile');
                 });
                 
                 // Handle play button clicks specifically
@@ -304,6 +325,7 @@
             const audio = document.getElementById('backgroundMusic');
             
             if (slider && value && audio) {
+                // Enhanced mobile volume control
                 slider.addEventListener('input', function() {
                     const volume = this.value / 100;
                     audio.volume = volume;
@@ -311,6 +333,15 @@
                     
                     // Store volume preference
                     localStorage.setItem('backgroundMusicVolume', this.value);
+                });
+                
+                // Mobile touch events for volume control
+                slider.addEventListener('touchstart', function() {
+                    console.log('Volume slider touched');
+                });
+                
+                slider.addEventListener('touchend', function() {
+                    console.log('Volume slider touch ended');
                 });
                 
                 // Load saved volume preference
