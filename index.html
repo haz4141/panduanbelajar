@@ -325,80 +325,157 @@
             const audio = document.getElementById('backgroundMusic');
             
             if (slider && value && audio) {
-                // Function to update volume
+                let isDragging = false;
+                let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // Function to update volume with proper iOS handling
                 function updateVolume(volumeValue) {
-                    const volume = volumeValue / 100;
-                    audio.volume = volume;
-                    value.textContent = volumeValue + '%';
+                    const volume = Math.max(0, Math.min(1, volumeValue / 100));
+                    
+                    // Force volume update for iOS
+                    audio.volume = 0; // Reset first
+                    setTimeout(() => {
+                        audio.volume = volume;
+                        console.log('Volume set to:', volume, 'Percentage:', volumeValue);
+                    }, 10);
+                    
+                    value.textContent = Math.round(volumeValue) + '%';
                     localStorage.setItem('backgroundMusicVolume', volumeValue);
+                    
+                    // Update slider visual position
+                    slider.value = volumeValue;
+                    
+                    // Update slider background to show progress
+                    updateSliderBackground(volumeValue);
                 }
                 
-                // Enhanced mobile volume control with multiple event listeners
+                // Function to update slider visual background
+                function updateSliderBackground(percentage) {
+                    const progress = Math.max(0, Math.min(100, percentage));
+                    slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${progress}%, #ddd ${progress}%, #ddd 100%)`;
+                }
+                
+                // Function to get accurate slider value
+                function getSliderValue() {
+                    return parseInt(slider.value);
+                }
+                
+                // Function to set slider value
+                function setSliderValue(val) {
+                    slider.value = val;
+                    updateVolume(val);
+                }
+                
+                // Enhanced input event for all devices
                 slider.addEventListener('input', function() {
-                    updateVolume(this.value);
-                });
-                
-                // Mobile-specific touch events
-                slider.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    console.log('Volume slider touch started');
-                });
-                
-                slider.addEventListener('touchmove', function(e) {
-                    e.preventDefault();
-                    const rect = this.getBoundingClientRect();
-                    const touch = e.touches[0];
-                    const percentage = (touch.clientX - rect.left) / rect.width;
-                    const newValue = Math.max(0, Math.min(100, Math.round(percentage * 100)));
-                    updateVolume(newValue);
-                });
-                
-                slider.addEventListener('touchend', function(e) {
-                    e.preventDefault();
-                    console.log('Volume slider touch ended');
-                });
-                
-                // Mouse events for desktop
-                slider.addEventListener('mousedown', function() {
-                    console.log('Volume slider mouse down');
-                });
-                
-                slider.addEventListener('mousemove', function(e) {
-                    if (e.buttons === 1) { // Left mouse button pressed
-                        const rect = this.getBoundingClientRect();
-                        const percentage = (e.clientX - rect.left) / rect.width;
-                        const newValue = Math.max(0, Math.min(100, Math.round(percentage * 100)));
-                        updateVolume(newValue);
-                    }
+                    const val = getSliderValue();
+                    updateVolume(val);
+                    console.log('Input event - Volume:', val);
                 });
                 
                 // Change event for better compatibility
                 slider.addEventListener('change', function() {
-                    updateVolume(this.value);
+                    const val = getSliderValue();
+                    updateVolume(val);
+                    console.log('Change event - Volume:', val);
+                });
+                
+                // Touch events for mobile
+                if (isMobile) {
+                    slider.addEventListener('touchstart', function(e) {
+                        isDragging = true;
+                        e.preventDefault();
+                        console.log('Touch start');
+                    });
+                    
+                    slider.addEventListener('touchmove', function(e) {
+                        if (isDragging) {
+                            e.preventDefault();
+                            const rect = this.getBoundingClientRect();
+                            const touch = e.touches[0];
+                            const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                            const newValue = Math.round(percentage * 100);
+                            setSliderValue(newValue);
+                        }
+                    });
+                    
+                    slider.addEventListener('touchend', function(e) {
+                        isDragging = false;
+                        e.preventDefault();
+                        console.log('Touch end - Final volume:', getSliderValue());
+                    });
+                    
+                    // iOS specific fixes
+                    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                        // Force iOS to recognize volume changes
+                        slider.addEventListener('input', function() {
+                            // Double trigger for iOS
+                            setTimeout(() => {
+                                const val = getSliderValue();
+                                audio.volume = val / 100;
+                                console.log('iOS volume fix - Volume:', val);
+                            }, 50);
+                        });
+                        
+                        // Additional iOS volume fix
+                        slider.addEventListener('change', function() {
+                            const val = getSliderValue();
+                            audio.volume = 0;
+                            setTimeout(() => {
+                                audio.volume = val / 100;
+                                console.log('iOS change fix - Volume:', val);
+                            }, 100);
+                        });
+                    }
+                }
+                
+                // Mouse events for desktop
+                slider.addEventListener('mousedown', function() {
+                    isDragging = true;
+                });
+                
+                slider.addEventListener('mousemove', function(e) {
+                    if (isDragging) {
+                        const rect = this.getBoundingClientRect();
+                        const percentage = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        const newValue = Math.round(percentage * 100);
+                        setSliderValue(newValue);
+                    }
+                });
+                
+                slider.addEventListener('mouseup', function() {
+                    isDragging = false;
                 });
                 
                 // Load saved volume preference
                 const savedVolume = localStorage.getItem('backgroundMusicVolume');
                 if (savedVolume) {
-                    slider.value = savedVolume;
-                    value.textContent = savedVolume + '%';
-                    audio.volume = savedVolume / 100;
+                    setSliderValue(parseInt(savedVolume));
                 } else {
-                    // Set default volume
-                    audio.volume = 0.05;
+                    setSliderValue(5); // Default 5%
                 }
                 
-                // Mobile-specific initialization
-                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                    // Add mobile-specific attributes
-                    slider.setAttribute('touch-action', 'none');
-                    slider.style.touchAction = 'none';
+                // Force initial volume setting
+                setTimeout(() => {
+                    const currentValue = getSliderValue();
+                    updateVolume(currentValue);
+                }, 100);
+                
+                // iOS specific audio initialization
+                if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    // Force audio to be ready for iOS
+                    audio.load();
+                    audio.preload = 'auto';
                     
-                    // Force mobile slider styling
-                    slider.style.webkitAppearance = 'none';
-                    slider.style.appearance = 'none';
-                    slider.style.height = '20px';
-                    slider.style.background = 'linear-gradient(to right, #667eea 0%, #667eea 5%, #ddd 5%, #ddd 100%)';
+                    // Additional iOS volume fix on page load
+                    setTimeout(() => {
+                        const currentValue = getSliderValue();
+                        audio.volume = 0;
+                        setTimeout(() => {
+                            audio.volume = currentValue / 100;
+                            console.log('iOS initial volume fix:', currentValue);
+                        }, 200);
+                    }, 500);
                 }
             }
         }
