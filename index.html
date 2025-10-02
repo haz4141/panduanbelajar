@@ -14,11 +14,11 @@
     </audio>
     
     <!-- Background Music Volume Control -->
-    <div class="background-music-controls" style="position: fixed; top: 20px; left: 20px; z-index: 1000; background: rgba(255,255,255,0.9); padding: 10px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 14px; color: #333;">🎵 Background:</span>
-            <input type="range" id="backgroundVolumeSlider" min="0" max="100" value="5" style="width: 100px;" touch-action="none">
-            <span id="backgroundVolumeValue" style="font-size: 12px; color: #666;">5%</span>
+    <div class="background-music-controls" style="position: fixed; top: 15px; left: 15px; z-index: 1000; background: rgba(255,255,255,0.9); padding: 6px; border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 11px; color: #333;">🎵 Background:</span>
+            <input type="range" id="backgroundVolumeSlider" min="0" max="100" value="5" style="width: 80px;" touch-action="none">
+            <span id="backgroundVolumeValue" style="font-size: 10px; color: #666;">5%</span>
         </div>
     </div>
     
@@ -36,6 +36,32 @@
                 document.body.style.overflow = 'auto';
                 // Show Chatbase chatbot after password is correct
                 showChatbaseWidget();
+                
+                // Preserve and continue background music
+                preserveBackgroundMusic();
+                
+                // DON'T interfere with background music - let it continue playing
+                // Just ensure it's playing at normal speed
+                setTimeout(() => {
+                    const audio = document.getElementById('backgroundMusic');
+                    if (audio) {
+                        // Only fix playback rate if it's wrong, don't restart or change volume
+                        if (audio.playbackRate !== 1.0) {
+                            audio.playbackRate = 1.0;
+                            console.log('Fixed audio playback rate to normal');
+                        }
+                        
+                        // If audio is paused, resume it (don't restart)
+                        if (audio.paused) {
+                            audio.play().catch(e => {
+                                console.log('Audio autoplay blocked after password');
+                            });
+                        }
+                        
+                        console.log('Background music continues playing after password');
+                    }
+                }, 100);
+                
                 // Initialize mobile audio after user interaction
                 setTimeout(initMobileAudio, 500);
                 // Initialize background music control
@@ -90,10 +116,16 @@
         function startMusic() {
             const audio = document.getElementById('backgroundMusic');
             if (audio) {
-                audio.volume = 0.05; // Set default volume to 5%
-                audio.play().catch(e => {
-                    console.log('Background music autoplay blocked, will start on user interaction');
-                });
+                // Only ensure normal playback rate, don't restart or change volume
+                audio.playbackRate = 1.0; // Ensure normal playback speed
+                
+                // Don't reset currentTime or volume - let it continue as is
+                // Only play if it's paused
+                if (audio.paused) {
+                    audio.play().catch(e => {
+                        console.log('Background music autoplay blocked, will start on user interaction');
+                    });
+                }
             }
         }
         
@@ -106,7 +138,12 @@
         
         // Also try to start immediately when page loads
         window.addEventListener('load', function() {
-            setTimeout(startMusic, 1000);
+            setTimeout(() => {
+                const audio = document.getElementById('backgroundMusic');
+                if (audio && audio.paused) {
+                    startMusic();
+                }
+            }, 1000);
         });
         
         // Background music control
@@ -120,19 +157,44 @@
             }
         }
         
-        // Enhanced mobile audio support
+        // Enhanced mobile audio support with iOS fixes
         function setupMobileAudio() {
             const audioElements = document.querySelectorAll('.chapter-audio');
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             
             audioElements.forEach(audio => {
                 // Add mobile-specific attributes
                 audio.setAttribute('playsinline', '');
                 audio.setAttribute('webkit-playsinline', '');
                 audio.setAttribute('preload', 'metadata');
-                audio.setAttribute('controlsList', 'nodownload');
+                audio.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+                
+                // iOS specific attributes
+                if (isIOS) {
+                    audio.setAttribute('x-webkit-airplay', 'allow');
+                    audio.setAttribute('webkit-playsinline', 'true');
+                    audio.style.width = '100%';
+                    audio.style.height = '70px';
+                    audio.style.minHeight = '70px';
+                    audio.style.maxHeight = '70px';
+                    audio.style.display = 'block';
+                    audio.style.visibility = 'visible';
+                    audio.style.opacity = '1';
+                    audio.style.position = 'relative';
+                    audio.style.zIndex = '10';
+                }
                 
                 // Force mobile audio to be ready
                 audio.load();
+                
+                // iOS specific initialization
+                if (isIOS) {
+                    setTimeout(() => {
+                        audio.load();
+                        audio.currentTime = 0;
+                    }, 500);
+                }
                 
                 // Handle mobile audio playback
                 audio.addEventListener('play', function() {
@@ -167,25 +229,39 @@
                     }
                 });
                 
-                // Handle mobile touch events - CRITICAL for mobile
-                audio.addEventListener('touchstart', function(e) {
-                    // Don't prevent default to allow native controls to work
-                    audio.load();
-                    // Force play on mobile touch
-                    setTimeout(() => {
-                        if (audio.paused) {
-                            audio.play().catch(e => {
-                                console.log('Touch play failed, user interaction required');
-                            });
-                        }
-                    }, 100);
-                });
+                // iOS specific touch events
+                if (isIOS) {
+                    audio.addEventListener('touchstart', function(e) {
+                        console.log('iOS touch start');
+                        audio.load();
+                        // iOS needs user gesture for audio
+                        setTimeout(() => {
+                            if (audio.paused) {
+                                audio.play().catch(err => {
+                                    console.log('iOS touch play failed:', err);
+                                });
+                            }
+                        }, 50);
+                    }, { passive: false });
+                    
+                    audio.addEventListener('touchend', function(e) {
+                        console.log('iOS touch end');
+                        // Ensure audio is visible and ready
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    }, { passive: false });
+                }
                 
                 // Handle mobile click events
                 audio.addEventListener('click', function(e) {
-                    // Don't prevent default to allow native controls to work
+                    console.log('Audio clicked');
                     audio.load();
-                    // Force play on mobile click
+                    // Ensure audio is visible
+                    audio.style.display = 'block';
+                    audio.style.visibility = 'visible';
+                    audio.style.opacity = '1';
+                    
                     setTimeout(() => {
                         if (audio.paused) {
                             audio.play().catch(e => {
@@ -195,29 +271,15 @@
                     }, 100);
                 });
                 
-                // Additional mobile play button handling
-                audio.addEventListener('play', function() {
-                    console.log('Audio started playing on mobile');
-                });
-                
-                // Handle play button clicks specifically
-                audio.addEventListener('play', function() {
-                    console.log('Audio started playing');
-                });
-                
-                // Handle pause button clicks specifically
-                audio.addEventListener('pause', function() {
-                    console.log('Audio paused');
-                });
-                
-                // Handle audio ended
-                audio.addEventListener('ended', function() {
-                    console.log('Audio ended');
-                });
-                
                 // Handle mobile user interaction requirement
                 audio.addEventListener('canplay', function() {
                     console.log('Audio ready for mobile playback');
+                    // Force visibility on iOS
+                    if (isIOS) {
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    }
                 });
                 
                 // Handle mobile audio errors
@@ -226,23 +288,53 @@
                     // Try to reload the audio
                     setTimeout(() => {
                         audio.load();
+                        if (isIOS) {
+                            audio.style.display = 'block';
+                            audio.style.visibility = 'visible';
+                            audio.style.opacity = '1';
+                        }
                     }, 1000);
                 });
                 
                 // Handle mobile audio loading
                 audio.addEventListener('loadstart', function() {
                     console.log('Audio loading started');
+                    if (isIOS) {
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    }
                 });
                 
                 // Handle mobile audio loaded
                 audio.addEventListener('loadedmetadata', function() {
                     console.log('Audio metadata loaded');
+                    if (isIOS) {
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    }
                 });
                 
                 // Add user interaction handler for mobile
                 audio.addEventListener('canplaythrough', function() {
                     console.log('Audio fully loaded and ready');
+                    if (isIOS) {
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    }
                 });
+                
+                // iOS specific ready state change
+                if (isIOS) {
+                    audio.addEventListener('readystatechange', function() {
+                        console.log('iOS ready state:', audio.readyState);
+                        audio.style.display = 'block';
+                        audio.style.visibility = 'visible';
+                        audio.style.opacity = '1';
+                    });
+                }
             });
         }
         
@@ -258,6 +350,497 @@
         
         // Initialize mobile audio support
         document.addEventListener('DOMContentLoaded', setupMobileAudio);
+        
+        // iOS specific initialization
+        function initIOSAudio() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            if (isIOS) {
+                console.log('iOS detected, initializing iOS audio fixes');
+                
+                // Force audio elements to be visible
+                const audioElements = document.querySelectorAll('.chapter-audio');
+                audioElements.forEach(audio => {
+                    // Set iOS specific styles
+                    audio.style.cssText = `
+                        width: 100% !important;
+                        height: 70px !important;
+                        min-height: 70px !important;
+                        max-height: 70px !important;
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        position: relative !important;
+                        z-index: 10 !important;
+                        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+                        border: 3px solid rgba(255, 255, 255, 0.3) !important;
+                        border-radius: 35px !important;
+                        -webkit-appearance: none !important;
+                        appearance: none !important;
+                        -webkit-transform: translateZ(0) !important;
+                        transform: translateZ(0) !important;
+                    `;
+                    
+                    // Force load and ready state
+                    audio.load();
+                    
+                    // Add iOS specific event listeners
+                    audio.addEventListener('loadeddata', function() {
+                        console.log('iOS audio loaded data');
+                        this.style.display = 'block';
+                        this.style.visibility = 'visible';
+                        this.style.opacity = '1';
+                    });
+                    
+                    audio.addEventListener('canplay', function() {
+                        console.log('iOS audio can play');
+                        this.style.display = 'block';
+                        this.style.visibility = 'visible';
+                        this.style.opacity = '1';
+                    });
+                    
+                    // Force visibility on any interaction
+                    ['touchstart', 'touchend', 'click', 'focus'].forEach(eventType => {
+                        audio.addEventListener(eventType, function() {
+                            console.log('iOS audio interaction:', eventType);
+                            this.style.display = 'block';
+                            this.style.visibility = 'visible';
+                            this.style.opacity = '1';
+                        });
+                    });
+                });
+                
+                // iOS specific volume slider fixes
+                const volumeSlider = document.getElementById('backgroundVolumeSlider');
+                if (volumeSlider) {
+                    volumeSlider.style.cssText = `
+                        height: 30px !important;
+                        border-radius: 15px !important;
+                        width: 140px !important;
+                        min-width: 140px !important;
+                        background: linear-gradient(to right, #667eea 0%, #667eea 5%, #ddd 5%, #ddd 100%) !important;
+                        border: 2px solid rgba(102, 126, 234, 0.3) !important;
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        -webkit-appearance: none !important;
+                        appearance: none !important;
+                    `;
+                }
+                
+                console.log('iOS audio initialization complete');
+            }
+        }
+        
+        // Initialize iOS audio on page load
+        window.addEventListener('load', initIOSAudio);
+        document.addEventListener('DOMContentLoaded', initIOSAudio);
+        
+        // Function to preserve background music state
+        function preserveBackgroundMusic() {
+            const audio = document.getElementById('backgroundMusic');
+            if (audio) {
+                // Store current state
+                const wasPlaying = !audio.paused;
+                const currentTime = audio.currentTime;
+                const currentVolume = audio.volume;
+                
+                console.log('Background music state:', { wasPlaying, currentTime, currentVolume });
+                
+                // If it was playing, ensure it continues
+                if (wasPlaying) {
+                    setTimeout(() => {
+                        if (audio.paused) {
+                            audio.currentTime = currentTime;
+                            audio.volume = currentVolume;
+                            audio.playbackRate = 1.0;
+                            audio.play().catch(e => {
+                                console.log('Failed to resume background music:', e);
+                            });
+                        }
+                    }, 100);
+                }
+            }
+        }
+        
+        // Special iOS background music volume control
+        function forceIOSBackgroundVolume(volume) {
+            const audio = document.getElementById('backgroundMusic');
+            const slider = document.getElementById('backgroundVolumeSlider');
+            const value = document.getElementById('backgroundVolumeValue');
+            
+            if (!audio || !slider || !value) return;
+            
+            const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            if (isIOS) {
+                console.log('Force iOS background volume to:', volume);
+                
+                // Set slider and display
+                slider.value = volume;
+                value.textContent = volume + '%';
+                
+                const volumeDecimal = volume / 100;
+                
+                // Aggressive volume setting for iOS
+                audio.volume = 0;
+                
+                // Multiple attempts with different timings
+                setTimeout(() => { audio.volume = volumeDecimal; }, 10);
+                setTimeout(() => { audio.volume = volumeDecimal; }, 50);
+                setTimeout(() => { audio.volume = volumeDecimal; }, 100);
+                setTimeout(() => { audio.volume = volumeDecimal; }, 200);
+                setTimeout(() => { audio.volume = volumeDecimal; }, 500);
+                
+                // If volume is 0, force pause
+                if (volumeDecimal === 0) {
+                    setTimeout(() => {
+                        audio.pause();
+                        console.log('iOS background music force paused');
+                    }, 100);
+                }
+                
+                // Store preference
+                localStorage.setItem('backgroundMusicVolume', volume);
+                
+                // Update visual background
+                slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${volume}%, #ddd ${volume}%, #ddd 100%)`;
+            }
+        }
+        
+        // Add global function for testing
+        window.forceIOSBackgroundVolume = forceIOSBackgroundVolume;
+        
+        // Custom Audio Control Functions
+        function toggleAudio(button) {
+            const container = button.closest('.ios-audio-container');
+            const audio = container.querySelector('.chapter-audio');
+            
+            if (audio.paused) {
+                // Pause all other audios first
+                document.querySelectorAll('.chapter-audio').forEach(otherAudio => {
+                    if (otherAudio !== audio && !otherAudio.paused) {
+                        otherAudio.pause();
+                        const otherContainer = otherAudio.closest('.ios-audio-container');
+                        const otherButton = otherContainer.querySelector('.play-pause-btn');
+                        otherButton.textContent = '▶️';
+                    }
+                });
+                
+                audio.play().then(() => {
+                    button.textContent = '⏸️';
+                    lowerBackgroundMusicVolume();
+                }).catch(e => {
+                    console.log('Play failed:', e);
+                    button.textContent = '▶️';
+                });
+            } else {
+                audio.pause();
+                button.textContent = '▶️';
+                restoreBackgroundMusicVolume();
+            }
+        }
+        
+        function seekAudio(slider) {
+            const container = slider.closest('.ios-audio-container');
+            const audio = container.querySelector('.chapter-audio');
+            if (audio.duration) {
+                audio.currentTime = (slider.value / 100) * audio.duration;
+            }
+        }
+        
+        function changeVolume(slider) {
+            const container = slider.closest('.ios-audio-container');
+            const audio = container.querySelector('.chapter-audio');
+            const volume = slider.value / 100;
+            
+            // iOS specific volume handling
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            if (isIOS) {
+                // iOS requires multiple attempts to change volume
+                audio.volume = 0; // Reset first
+                setTimeout(() => {
+                    audio.volume = volume;
+                    console.log('iOS volume set to:', volume);
+                    
+                    // Backup attempt
+                    setTimeout(() => {
+                        if (Math.abs(audio.volume - volume) > 0.01) {
+                            audio.volume = volume;
+                            console.log('iOS volume backup set to:', volume);
+                        }
+                    }, 50);
+                    
+                    // Another backup attempt
+                    setTimeout(() => {
+                        if (Math.abs(audio.volume - volume) > 0.01) {
+                            audio.volume = volume;
+                            console.log('iOS volume final set to:', volume);
+                        }
+                    }, 100);
+                }, 10);
+                
+                // Force volume change by playing/pausing briefly if needed
+                if (volume > 0 && audio.paused) {
+                    const wasPlaying = false;
+                    audio.play().then(() => {
+                        audio.pause();
+                        console.log('iOS volume trigger play/pause');
+                    }).catch(e => {
+                        console.log('iOS volume trigger failed:', e);
+                    });
+                }
+            } else {
+                // Standard volume setting for non-iOS devices
+                audio.volume = volume;
+            }
+            
+            // Update volume icon
+            const volumeIcon = container.querySelector('.volume-container span');
+            if (volume === 0) {
+                volumeIcon.textContent = '🔇';
+            } else if (volume < 0.5) {
+                volumeIcon.textContent = '🔉';
+            } else {
+                volumeIcon.textContent = '🔊';
+            }
+            
+            // Update volume bar visual background
+            updateCustomVolumeBarBackground(slider, volume);
+            
+            // Store volume preference
+            localStorage.setItem('audioVolume_' + audio.src, volume);
+        }
+        
+        function updateCustomVolumeBarBackground(slider, volume) {
+            const percentage = Math.round(volume * 100);
+            
+            // Enhanced visual background with gradient
+            slider.style.background = `linear-gradient(to right, 
+                #667eea 0%, 
+                #764ba2 ${percentage}%, 
+                #e9ecef ${percentage}%, 
+                #f8f9fa 100%
+            )`;
+            
+            // Add glow effect for active volume
+            if (percentage > 0) {
+                slider.style.boxShadow = `
+                    inset 0 2px 4px rgba(0,0,0,0.1),
+                    0 4px 15px rgba(102, 126, 234, 0.2),
+                    0 0 0 1px rgba(255,255,255,0.5),
+                    0 0 ${percentage/2}px rgba(102, 126, 234, 0.3)
+                `;
+            } else {
+                slider.style.boxShadow = `
+                    inset 0 2px 4px rgba(0,0,0,0.1),
+                    0 4px 15px rgba(102, 126, 234, 0.2),
+                    0 0 0 1px rgba(255,255,255,0.5)
+                `;
+            }
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return mins + ':' + (secs < 10 ? '0' : '') + secs;
+        }
+        
+        function updateAudioProgress() {
+            document.querySelectorAll('.ios-audio-container').forEach(container => {
+                const audio = container.querySelector('.chapter-audio');
+                const progressBar = container.querySelector('.progress-bar');
+                const timeDisplay = container.querySelector('.time-display');
+                const playButton = container.querySelector('.play-pause-btn');
+                
+                if (audio.duration) {
+                    const progress = (audio.currentTime / audio.duration) * 100;
+                    progressBar.value = progress;
+                    timeDisplay.textContent = formatTime(audio.currentTime) + ' / ' + formatTime(audio.duration);
+                }
+                
+                // Update play/pause button
+                if (audio.paused) {
+                    playButton.textContent = '▶️';
+                } else {
+                    playButton.textContent = '⏸️';
+                }
+                
+                // Handle audio end
+                if (audio.ended) {
+                    playButton.textContent = '▶️';
+                    progressBar.value = 0;
+                    restoreBackgroundMusicVolume();
+                }
+            });
+        }
+        
+        // Update progress every second
+        setInterval(updateAudioProgress, 1000);
+        
+        // Initialize custom audio controls
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.ios-audio-container').forEach(container => {
+                const audio = container.querySelector('.chapter-audio');
+                const progressBar = container.querySelector('.progress-bar');
+                const volumeBar = container.querySelector('.volume-bar');
+                
+                // Set initial volume
+                audio.volume = 1;
+                volumeBar.value = 100;
+                
+                // Load saved volume preference
+                const savedVolume = localStorage.getItem('audioVolume_' + audio.src);
+                if (savedVolume) {
+                    audio.volume = parseFloat(savedVolume);
+                    volumeBar.value = Math.round(parseFloat(savedVolume) * 100);
+                    
+                    // Update volume icon
+                    const volumeIcon = container.querySelector('.volume-container span');
+                    const volume = parseFloat(savedVolume);
+                    if (volume === 0) {
+                        volumeIcon.textContent = '🔇';
+                    } else if (volume < 0.5) {
+                        volumeIcon.textContent = '🔉';
+                    } else {
+                        volumeIcon.textContent = '🔊';
+                    }
+                    
+                    // Update volume bar background
+                    updateCustomVolumeBarBackground(volumeBar, volume);
+                } else {
+                    // Set initial volume bar background for 100%
+                    updateCustomVolumeBarBackground(volumeBar, 1);
+                }
+                
+                // Load audio
+                audio.load();
+                
+                // iOS specific volume slider enhancements
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                
+                if (isIOS) {
+                    // Enhanced iOS volume slider touch handling
+                    let isVolumeDragging = false;
+                    
+                    volumeBar.addEventListener('touchstart', function(e) {
+                        isVolumeDragging = true;
+                        console.log('iOS volume touch start');
+                        // Don't prevent default to allow native behavior
+                    }, { passive: false });
+                    
+                    volumeBar.addEventListener('touchmove', function(e) {
+                        if (isVolumeDragging) {
+                            const rect = this.getBoundingClientRect();
+                            const touch = e.touches[0];
+                            const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                            const newValue = Math.round(percentage * 100);
+                            this.value = newValue;
+                            
+                            // Immediately update volume
+                            const volume = newValue / 100;
+                            audio.volume = 0;
+                            setTimeout(() => {
+                                audio.volume = volume;
+                                console.log('iOS volume touch move:', volume);
+                            }, 10);
+                            
+                            // Update volume icon
+                            const volumeIcon = container.querySelector('.volume-container span');
+                            if (volume === 0) {
+                                volumeIcon.textContent = '🔇';
+                            } else if (volume < 0.5) {
+                                volumeIcon.textContent = '🔉';
+                            } else {
+                                volumeIcon.textContent = '🔊';
+                            }
+                            
+                            e.preventDefault();
+                        }
+                    }, { passive: false });
+                    
+                    volumeBar.addEventListener('touchend', function(e) {
+                        isVolumeDragging = false;
+                        console.log('iOS volume touch end, final value:', this.value);
+                        
+                        // Final volume update
+                        const volume = this.value / 100;
+                        audio.volume = 0;
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS volume touch end set to:', volume);
+                        }, 50);
+                        
+                        // Store preference
+                        localStorage.setItem('audioVolume_' + audio.src, volume);
+                    }, { passive: false });
+                    
+                    // iOS specific input event handling
+                    volumeBar.addEventListener('input', function() {
+                        const volume = this.value / 100;
+                        audio.volume = 0;
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS volume input:', volume);
+                        }, 10);
+                        
+                        // Multiple backup attempts
+                        setTimeout(() => {
+                            audio.volume = volume;
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            audio.volume = volume;
+                        }, 200);
+                        
+                        // Update icon
+                        const volumeIcon = container.querySelector('.volume-container span');
+                        if (volume === 0) {
+                            volumeIcon.textContent = '🔇';
+                        } else if (volume < 0.5) {
+                            volumeIcon.textContent = '🔉';
+                        } else {
+                            volumeIcon.textContent = '🔊';
+                        }
+                        
+                        // Store preference
+                        localStorage.setItem('audioVolume_' + audio.src, volume);
+                    });
+                }
+                
+                // Handle audio events
+                audio.addEventListener('loadedmetadata', function() {
+                    progressBar.max = 100;
+                    updateAudioProgress();
+                });
+                
+                audio.addEventListener('play', function() {
+                    const playButton = container.querySelector('.play-pause-btn');
+                    playButton.textContent = '⏸️';
+                });
+                
+                audio.addEventListener('pause', function() {
+                    const playButton = container.querySelector('.play-pause-btn');
+                    playButton.textContent = '▶️';
+                });
+                
+                // iOS specific volume sync
+                if (isIOS) {
+                    setInterval(() => {
+                        const expectedVolume = volumeBar.value / 100;
+                        if (Math.abs(audio.volume - expectedVolume) > 0.01) {
+                            audio.volume = expectedVolume;
+                            console.log('iOS volume sync to:', expectedVolume);
+                        }
+                    }, 1000);
+                }
+            });
+        });
         
         // Mobile audio test function
         function testMobileAudio() {
@@ -326,19 +909,82 @@
             const audio = document.getElementById('backgroundMusic');
             
             if (slider && value && audio) {
+                // Only fix playback rate if it's wrong, don't change volume or restart
+                if (audio.playbackRate !== 1.0) {
+                    audio.playbackRate = 1.0;
+                    console.log('Fixed audio playback rate in setup');
+                }
+                
+                // Don't change volume or currentTime - let it continue as is
+                
                 let isDragging = false;
                 let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                 
-                // Function to update volume with proper iOS handling
+                // Enhanced iOS volume update function
                 function updateVolume(volumeValue) {
                     const volume = Math.max(0, Math.min(1, volumeValue / 100));
                     
-                    // Force volume update for iOS
-                    audio.volume = 0; // Reset first
-                    setTimeout(() => {
+                    // Always ensure playback rate is normal
+                    audio.playbackRate = 1.0;
+                    
+                    if (isIOS) {
+                        console.log('iOS background music volume update:', volume);
+                        
+                        // iOS requires aggressive volume setting
+                        audio.volume = 0; // Reset first
+                        
+                        // Multiple attempts to set volume on iOS
+                        setTimeout(() => {
+                            audio.playbackRate = 1.0;
+                            audio.volume = volume;
+                            console.log('iOS volume attempt 1:', volume);
+                        }, 10);
+                        
+                        setTimeout(() => {
+                            audio.playbackRate = 1.0;
+                            audio.volume = volume;
+                            console.log('iOS volume attempt 2:', volume);
+                        }, 50);
+                        
+                        setTimeout(() => {
+                            audio.playbackRate = 1.0;
+                            audio.volume = volume;
+                            console.log('iOS volume attempt 3:', volume);
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            audio.playbackRate = 1.0;
+                            audio.volume = volume;
+                            console.log('iOS volume attempt 4:', volume);
+                        }, 200);
+                        
+                        // Force audio reload if volume is 0
+                        if (volume === 0) {
+                            audio.pause();
+                            setTimeout(() => {
+                                audio.load();
+                                audio.playbackRate = 1.0;
+                                console.log('iOS audio reloaded for volume 0');
+                            }, 100);
+                        }
+                        
+                        // Additional iOS volume enforcement
+                        setTimeout(() => {
+                            if (Math.abs(audio.volume - volume) > 0.01) {
+                                audio.playbackRate = 1.0;
+                                audio.volume = volume;
+                                console.log('iOS volume enforcement:', volume);
+                            }
+                        }, 500);
+                        
+                    } else {
+                        // Standard volume setting for non-iOS
+                        audio.playbackRate = 1.0;
                         audio.volume = volume;
-                        console.log('Volume set to:', volume, 'Percentage:', volumeValue);
-                    }, 10);
+                        console.log('Standard volume set to:', volume);
+                    }
                     
                     value.textContent = Math.round(volumeValue) + '%';
                     localStorage.setItem('backgroundMusicVolume', volumeValue);
@@ -353,7 +999,30 @@
                 // Function to update slider visual background
                 function updateSliderBackground(percentage) {
                     const progress = Math.max(0, Math.min(100, percentage));
-                    slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${progress}%, #ddd ${progress}%, #ddd 100%)`;
+                    
+                    // Enhanced visual background with gradient
+                    slider.style.background = `linear-gradient(to right, 
+                        #667eea 0%, 
+                        #764ba2 ${progress}%, 
+                        #e9ecef ${progress}%, 
+                        #f8f9fa 100%
+                    )`;
+                    
+                    // Add glow effect for active volume
+                    if (progress > 0) {
+                        slider.style.boxShadow = `
+                            inset 0 2px 4px rgba(0,0,0,0.1),
+                            0 4px 15px rgba(102, 126, 234, 0.2),
+                            0 0 0 1px rgba(255,255,255,0.5),
+                            0 0 ${progress/2}px rgba(102, 126, 234, 0.3)
+                        `;
+                    } else {
+                        slider.style.boxShadow = `
+                            inset 0 2px 4px rgba(0,0,0,0.1),
+                            0 4px 15px rgba(102, 126, 234, 0.2),
+                            0 0 0 1px rgba(255,255,255,0.5)
+                        `;
+                    }
                 }
                 
                 // Function to get accurate slider value
@@ -371,51 +1040,149 @@
                 slider.addEventListener('input', function() {
                     const val = getSliderValue();
                     updateVolume(val);
-                    console.log('Input event - Volume:', val);
+                    console.log('Background music input event - Volume:', val);
+                    
+                    if (isIOS) {
+                        // Additional iOS input handling
+                        const volume = val / 100;
+                        audio.volume = 0;
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS input volume backup:', volume);
+                        }, 20);
+                    }
                 });
                 
                 // Change event for better compatibility
                 slider.addEventListener('change', function() {
                     const val = getSliderValue();
                     updateVolume(val);
-                    console.log('Change event - Volume:', val);
+                    console.log('Background music change event - Volume:', val);
+                    
+                    if (isIOS) {
+                        // Additional iOS change handling
+                        const volume = val / 100;
+                        audio.volume = 0;
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS change volume backup:', volume);
+                        }, 30);
+                        
+                        // If volume is 0, ensure audio is paused
+                        if (volume === 0) {
+                            setTimeout(() => {
+                                audio.pause();
+                                console.log('iOS audio paused on change for volume 0');
+                            }, 100);
+                        }
+                    }
                 });
                 
-                // Touch events for mobile
+                // Enhanced touch events for mobile with iOS improvements
                 if (isMobile) {
                     slider.addEventListener('touchstart', function(e) {
                         isDragging = true;
-                        e.preventDefault();
-                        console.log('Touch start');
-                    });
+                        console.log('Background music touch start');
+                        
+                        if (isIOS) {
+                            // iOS specific touch start
+                            console.log('iOS background music touch start');
+                            slider.style.transform = 'scale(1.1)';
+                            slider.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.5)';
+                        }
+                        
+                        // Don't prevent default on iOS to allow native behavior
+                        if (!isIOS) {
+                            e.preventDefault();
+                        }
+                    }, { passive: false });
                     
                     slider.addEventListener('touchmove', function(e) {
                         if (isDragging) {
-                            e.preventDefault();
                             const rect = this.getBoundingClientRect();
                             const touch = e.touches[0];
                             const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
                             const newValue = Math.round(percentage * 100);
                             setSliderValue(newValue);
+                            
+                            console.log('Background music touch move:', newValue);
+                            
+                            if (isIOS) {
+                                e.preventDefault();
+                                // Force immediate volume update on iOS
+                                const volume = newValue / 100;
+                                audio.volume = 0;
+                                setTimeout(() => {
+                                    audio.volume = volume;
+                                    console.log('iOS touch move volume:', volume);
+                                }, 5);
+                                
+                                // Visual feedback
+                                slider.style.transform = 'scale(1.05)';
+                                slider.style.boxShadow = '0 0 25px rgba(102, 126, 234, 0.6)';
+                            }
                         }
-                    });
+                    }, { passive: false });
                     
                     slider.addEventListener('touchend', function(e) {
                         isDragging = false;
-                        e.preventDefault();
-                        console.log('Touch end - Final volume:', getSliderValue());
-                    });
+                        const finalValue = getSliderValue();
+                        console.log('Background music touch end - Final volume:', finalValue);
+                        
+                        if (isIOS) {
+                            // iOS specific final update with multiple attempts
+                            const volume = finalValue / 100;
+                            
+                            // Reset and set volume multiple times
+                            audio.volume = 0;
+                            setTimeout(() => {
+                                audio.volume = volume;
+                                console.log('iOS touchend volume 1:', volume);
+                            }, 10);
+                            
+                            setTimeout(() => {
+                                audio.volume = volume;
+                                console.log('iOS touchend volume 2:', volume);
+                            }, 50);
+                            
+                            setTimeout(() => {
+                                audio.volume = volume;
+                                console.log('iOS touchend volume 3:', volume);
+                            }, 100);
+                            
+                            // If volume is 0, pause the audio completely
+                            if (volume === 0) {
+                                setTimeout(() => {
+                                    audio.pause();
+                                    console.log('iOS audio paused for volume 0');
+                                }, 150);
+                            }
+                            
+                            // Reset visual feedback
+                            slider.style.transform = 'scale(1)';
+                            slider.style.boxShadow = 'none';
+                        }
+                    }, { passive: false });
                     
-                    // iOS specific fixes
+                    // iOS specific fixes with improved handling
                     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
                         // Force iOS to recognize volume changes
                         slider.addEventListener('input', function() {
-                            // Double trigger for iOS
+                            const val = getSliderValue();
+                            // Multiple attempts to ensure iOS recognizes the change
+                            audio.volume = 0;
                             setTimeout(() => {
-                                const val = getSliderValue();
                                 audio.volume = val / 100;
-                                console.log('iOS volume fix - Volume:', val);
-                            }, 50);
+                                console.log('iOS input fix - Volume:', val);
+                                // Force visual update
+                                updateSliderBackground(val);
+                            }, 10);
+                            
+                            // Backup update
+                            setTimeout(() => {
+                                audio.volume = val / 100;
+                                console.log('iOS input backup - Volume:', val);
+                            }, 100);
                         });
                         
                         // Additional iOS volume fix
@@ -425,7 +1192,30 @@
                             setTimeout(() => {
                                 audio.volume = val / 100;
                                 console.log('iOS change fix - Volume:', val);
-                            }, 100);
+                                updateSliderBackground(val);
+                            }, 50);
+                            
+                            // Multiple backup attempts
+                            setTimeout(() => {
+                                audio.volume = val / 100;
+                            }, 150);
+                            
+                            setTimeout(() => {
+                                audio.volume = val / 100;
+                            }, 300);
+                        });
+                        
+                        // iOS specific focus/blur handling
+                        slider.addEventListener('focus', function() {
+                            console.log('iOS slider focused');
+                            this.style.transform = 'scale(1.1)';
+                            this.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.5)';
+                        });
+                        
+                        slider.addEventListener('blur', function() {
+                            console.log('iOS slider blurred');
+                            this.style.transform = 'scale(1)';
+                            this.style.boxShadow = 'none';
                         });
                     }
                 }
@@ -462,21 +1252,76 @@
                     updateVolume(currentValue);
                 }, 100);
                 
-                // iOS specific audio initialization
-                if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                // iOS specific audio initialization with enhanced handling
+                if (isIOS) {
+                    console.log('iOS background music initialization');
+                    
                     // Force audio to be ready for iOS
                     audio.load();
                     audio.preload = 'auto';
                     
-                    // Additional iOS volume fix on page load
+                    // Enhanced iOS volume initialization
                     setTimeout(() => {
                         const currentValue = getSliderValue();
+                        const volume = currentValue / 100;
+                        
+                        // Multiple volume setting attempts
                         audio.volume = 0;
                         setTimeout(() => {
-                            audio.volume = currentValue / 100;
-                            console.log('iOS initial volume fix:', currentValue);
-                        }, 200);
+                            audio.volume = volume;
+                            console.log('iOS background music initial volume 1:', volume);
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS background music initial volume 2:', volume);
+                        }, 300);
+                        
+                        setTimeout(() => {
+                            audio.volume = volume;
+                            console.log('iOS background music initial volume 3:', volume);
+                        }, 600);
+                        
+                        updateSliderBackground(currentValue);
                     }, 500);
+                    
+                    // iOS specific aggressive volume sync
+                    setInterval(() => {
+                        const currentValue = getSliderValue();
+                        const expectedVolume = currentValue / 100;
+                        
+                        // Check if volume is different and force correction
+                        if (Math.abs(audio.volume - expectedVolume) > 0.01) {
+                            console.log('iOS background music volume correction needed:', expectedVolume, 'current:', audio.volume);
+                            
+                            // Force volume correction
+                            audio.volume = 0;
+                            setTimeout(() => {
+                                audio.volume = expectedVolume;
+                                console.log('iOS background music volume corrected to:', expectedVolume);
+                            }, 10);
+                            
+                            // If volume should be 0, pause audio
+                            if (expectedVolume === 0 && !audio.paused) {
+                                audio.pause();
+                                console.log('iOS background music paused for volume 0');
+                            }
+                        }
+                    }, 1000); // Check every second for iOS
+                    
+                    // Additional iOS volume enforcement
+                    setInterval(() => {
+                        const currentValue = getSliderValue();
+                        const expectedVolume = currentValue / 100;
+                        
+                        if (expectedVolume === 0) {
+                            audio.pause();
+                        } else if (expectedVolume > 0 && audio.paused) {
+                            audio.play().catch(e => {
+                                console.log('iOS background music play failed:', e);
+                            });
+                        }
+                    }, 500); // Check every 500ms for play/pause state
                 }
             }
         }
@@ -534,10 +1379,23 @@
             <!-- Audio Player for Bab 1 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 1</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab1.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab1.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -597,10 +1455,23 @@
             <!-- Audio Player for Bab 2 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 2</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab2.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab2.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -697,10 +1568,23 @@
             <!-- Audio Player for Bab 3 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 3</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab3.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab3.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -770,10 +1654,23 @@
             <!-- Audio Player for Bab 4 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 4</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab4.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab4.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -845,10 +1742,23 @@
             <!-- Audio Player for Bab 5 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 5</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab5.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab5.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -917,10 +1827,23 @@
             <!-- Audio Player for Bab 6 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 6</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab6.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab6.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -1021,10 +1944,23 @@
             <!-- Audio Player for Bab 7 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 7</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab7.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab7.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -1099,10 +2035,23 @@
             <!-- Audio Player for Bab 8 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 8</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab8.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab8.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
@@ -1212,10 +2161,23 @@
             <!-- Audio Player for Bab 9 -->
             <div class="audio-player">
                 <h3>🎧 Dengarkan Audio Bab 9</h3>
-                <audio controls class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
-                    <source src="Bab9.mp3" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+                <div class="ios-audio-container">
+                    <audio class="chapter-audio" preload="metadata" playsinline webkit-playsinline>
+                        <source src="Bab9.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    <div class="custom-audio-controls">
+                        <button class="play-pause-btn" onclick="toggleAudio(this)">▶️</button>
+                        <div class="progress-container">
+                            <input type="range" class="progress-bar" min="0" max="100" value="0" onchange="seekAudio(this)">
+                            <span class="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="volume-container">
+                            <span>🔊</span>
+                            <input type="range" class="volume-bar" min="0" max="100" value="100" onchange="changeVolume(this)">
+                        </div>
+                    </div>
+                </div>
                 <p class="audio-note">Dengarkan audio untuk pengalaman belajar yang lebih mendalam</p>
             </div>
             
