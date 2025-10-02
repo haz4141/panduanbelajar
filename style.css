@@ -679,33 +679,91 @@ blockquote cite {
     #backgroundVolumeSlider {
         -webkit-appearance: none;
         appearance: none;
-        height: 8px;
-        border-radius: 4px;
-        background: #ddd;
+        height: 20px;
+        border-radius: 10px;
+        background: linear-gradient(to right, #667eea 0%, #667eea 5%, #ddd 5%, #ddd 100%);
         outline: none;
         cursor: pointer;
+        touch-action: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        position: relative;
     }
     
     #backgroundVolumeSlider::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         background: #667eea;
         cursor: pointer;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        border: 3px solid white;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.2s ease;
+    }
+    
+    #backgroundVolumeSlider::-webkit-slider-thumb:active {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
     }
     
     #backgroundVolumeSlider::-moz-range-thumb {
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         background: #667eea;
         cursor: pointer;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        border: 3px solid white;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+        transition: all 0.2s ease;
+    }
+    
+    #backgroundVolumeSlider::-moz-range-thumb:active {
+        transform: scale(1.2);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* Mobile-specific slider improvements */
+    @media screen and (max-width: 768px) {
+        #backgroundVolumeSlider {
+            height: 25px;
+            background: linear-gradient(to right, #667eea 0%, #667eea 5%, #ddd 5%, #ddd 100%);
+            border-radius: 12px;
+            touch-action: none;
+        }
+        
+        #backgroundVolumeSlider::-webkit-slider-thumb {
+            width: 28px;
+            height: 28px;
+            border: 3px solid white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        #backgroundVolumeSlider::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+            border: 3px solid white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .background-music-controls {
+            padding: 15px !important;
+            border-radius: 15px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+        }
+        
+        .background-music-controls span {
+            font-size: 16px !important;
+            font-weight: 600 !important;
+        }
+        
+        #backgroundVolumeValue {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #333 !important;
+        }
     }
     
     .audio-player {
