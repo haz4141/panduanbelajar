@@ -681,7 +681,7 @@ blockquote cite {
         appearance: none;
         height: 20px;
         border-radius: 10px;
-        background: linear-gradient(to right, #667eea 0%, #667eea 5%, #ddd 5%, #ddd 100%);
+        background: #ddd;
         outline: none;
         cursor: pointer;
         touch-action: none;
@@ -689,6 +689,22 @@ blockquote cite {
         -webkit-user-select: none;
         user-select: none;
         position: relative;
+        width: 100px;
+        min-width: 100px;
+    }
+    
+    /* Dynamic background based on value */
+    #backgroundVolumeSlider::-webkit-slider-track {
+        background: #ddd;
+        height: 20px;
+        border-radius: 10px;
+    }
+    
+    #backgroundVolumeSlider::-moz-range-track {
+        background: #ddd;
+        height: 20px;
+        border-radius: 10px;
+        border: none;
     }
     
     #backgroundVolumeSlider::-webkit-slider-thumb {
