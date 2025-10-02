@@ -25,7 +25,7 @@
         // Simple password protection
         function checkPassword() {
             var password = document.getElementById('passwordInput').value;
-            if (password === 'hazvoucher') {
+            if (password === 'haz') {
                 document.getElementById('passwordModal').style.display = 'none';
                 // Remove blur from background pages
                 var pages = document.querySelectorAll('.page');
@@ -517,6 +517,7 @@
                     <li><a href="#chapter7">Bab 7: Kisah Inspirasi</a></li>
                     <li><a href="#chapter8">Bab 8: Strategi Praktikal Belajar Gaya Islam</a></li>
                     <li><a href="#chapter9">Bab 9: Penutup dan Wasiat Ilmu</a></li>
+                    <li><a href="#donation">💝 Sokong Penulis !</a></li>
                 </ul>
             </nav>
         </div>
@@ -1265,13 +1266,169 @@
         </div>
     </div>
 
+    <!-- Bahagian Derma -->
+    <div class="page donation-page" id="donation">
+        <div class="page-header">
+            <h1>💝 Sokong Penulis !</h1>
+        </div>
+        <div class="donation-content">
+            <div class="donation-intro">
+                <p class="drop-cap">Ilmu ini dihamparkan dengan PERCUMA ,buat semua pelajar yang dahaga. Jika ada manfaat singgah di hati, hulurkanlah sokongan, sekadar mampu.</p>
+                
+                <p>Sokongan anda membantu saya:</p>
+                <ul>
+                    <li>📚 Menulis lagi, agar ilmu tak terhenti</li>
+                    <li>🔧 Menyelenggara dan membaiki laman ini</li>
+                    <li>🌍 Mencapai lebih ramai pelajar di seluruh dunia</li>
+                    <li>💡 Mencipta sumber baru, menyalakan harapan anak bangsa</li>
+                </ul>
+            </div>
 
+            <div class="donation-options">
+                <h2>Pilih Cara Sokongan Anda</h2>
+                
+                <!-- Derma PayPal -->
+                <div class="donation-option">
+                    <div class="donation-card">
+                        <div class="donation-icon">💳</div>
+                        <h3>PayPal</h3>
+                        <p>Derma selamat dan pantas</p>
+                        <div class="donation-amounts">
+                            <button class="amount-btn" onclick="donatePayPal(5)">RM5</button>
+                            <button class="amount-btn" onclick="donatePayPal(10)">RM10</button>
+                            <button class="amount-btn" onclick="donatePayPal(25)">RM25</button>
+                            <button class="amount-btn" onclick="donatePayPal(50)">RM50</button>
+                        </div>
+                        <button class="custom-amount-btn" onclick="donatePayPalCustom()">Jumlah Sendiri</button>
+                    </div>
+                </div>
+
+                <!-- Pemindahan Bank -->
+                <div class="donation-option">
+                    <div class="donation-card">
+                        <div class="donation-icon">🏦</div>
+                        <h3>Pemindahan Bank</h3>
+                        <p>Pemindahan terus ke bank</p>
+                        <div class="bank-details">
+                            <div class="bank-info">
+                                <strong>Bank:</strong> Bank Islam<br>
+                                <strong>Akaun:</strong> 11068021418933<br>
+                                <strong>Nama:</strong> Mohd Hazami<br>
+                                <strong>Rujukan:</strong> "Sokongan Pendidikan"
+                            </div>
+                            <div class="qr-code-section">
+                                <h4>📱 QR Code untuk Pemindahan Pantas</h4>
+                                <div class="qr-code-container">
+                                    <img src="qr.jpg" 
+                                         alt="QR Code Bank Islam" 
+                                         class="qr-code-image">
+                                    <p class="qr-note">Imbas QR code untuk pemindahan pantas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mata Wang Kripto -->
+                <div class="donation-option">
+                    <div class="donation-card">
+                        <div class="donation-icon">₿</div>
+                        <h3>Mata Wang Kripto</h3>
+                        <p>Bitcoin dan kripto lain</p>
+                        <div class="crypto-addresses">
+                            <div class="crypto-option">
+                                <strong>Bitcoin:</strong>
+                                <code class="crypto-address">bc1q4gnh5mq2qk0pyzq4sc9rgk3c3jry02xxezee7n</code>
+                                <button class="copy-btn" onclick="copyToClipboard('bc1q4gnh5mq2qk0pyzq4sc9rgk3c3jry02xxezee7n')">Salin</button>
+                            </div>
+                            <div class="crypto-option">
+                                <strong>Ethereum:</strong>
+                                <code class="crypto-address">0x5F563F055d0cB94bd18394bc896a02DB42D32729</code>
+                                <button class="copy-btn" onclick="copyToClipboard('0x5F563F055d0cB94bd18394bc896a02DB42D32729')">Salin</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="donation-note">
+                <p><strong>Nota:</strong> Semua derma adalah pilihan sepenuhnya. Sumber ini akan sentiasa percuma untuk pelajar. Sokongan anda adalah sukarela dan amat dihargai.</p>
+            </div>
+
+            <div class="thank-you-message">
+                <h3>🙏 Terima Kasih!</h3>
+                <p>Sama ada anda memilih untuk menyokong secara kewangan atau sekadar berkongsi sumber ini dengan orang lain, sumbangan anda dalam menyebarkan ilmu amat berharga. Semoga Allah memberkati perjalanan pembelajaran anda!</p>
+            </div>
+        </div>
+    </div>
 
     <!-- Print Controls (hidden by default) -->
     <div class="print-controls">
         <button onclick="window.print()" class="print-btn">Print / Export PDF</button>
     </div>
 
+    <!-- Donation Scripts -->
+    <script>
+        // Donation Functions
+        function donatePayPal(amount) {
+            // Replace with your actual PayPal donation link
+            const paypalLink = `https://www.paypal.com/donate/?business=hazamimohd@gmail.com&item_name=Educational+Support&amount=${amount}&currency_code=MYR`;
+            window.open(paypalLink, '_blank');
+            
+            // Track donation attempt
+            console.log('Donation attempt:', amount);
+        }
+        
+        function donatePayPalCustom() {
+            const amount = prompt('Masukkan jumlah derma (RM):');
+            if (amount && !isNaN(amount) && amount > 0) {
+                donatePayPal(amount);
+            } else if (amount !== null) {
+                alert('Sila masukkan jumlah yang sah.');
+            }
+        }
+        
+        function copyToClipboard(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopySuccess();
+                });
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showCopySuccess();
+            }
+        }
+        
+        function showCopySuccess() {
+            // Create temporary success message
+            const successMsg = document.createElement('div');
+            successMsg.textContent = 'Telah disalin ke papan keratan!';
+            successMsg.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #28a745;
+                color: white;
+                padding: 1rem 2rem;
+                border-radius: 10px;
+                z-index: 10000;
+                font-weight: 600;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(successMsg);
+            
+            setTimeout(() => {
+                document.body.removeChild(successMsg);
+            }, 2000);
+        }
+    </script>
+
 </body>
 </html>
-
